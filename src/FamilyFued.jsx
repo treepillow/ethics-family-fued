@@ -178,115 +178,152 @@ function useMusicEngine() {
       ctxRef.current = ctx;
       playingRef.current = true;
 
-      // Master chain: gain → warm lowpass → destination
+      // Master gain
       const master = ctx.createGain();
-      master.gain.value = 0.14;
-      const warmth = ctx.createBiquadFilter();
-      warmth.type = "lowpass";
-      warmth.frequency.value = 4000;
-      warmth.Q.value = 0.4;
-      master.connect(warmth);
-      warmth.connect(ctx.destination);
+      master.gain.value = 0.16;
+      master.connect(ctx.destination);
 
-      // Lo-fi: 80 BPM, 4-bar loop cycling through jazz chords
-      const BPM = 80;
-      const beat = 60 / BPM;       // 0.75s
-      const bar = beat * 4;         // 3s
-      const LOOP = bar * 4;         // 12s — full 4-bar cycle
+      // Helper: punchy brass stab (sawtooth + bandpass = horn-like)
+      const brass = (freq, t, dur, vol = 0.18) => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        const bp = ctx.createBiquadFilter();
+        bp.type = "bandpass"; bp.frequency.value = freq * 2.5; bp.Q.value = 1.5;
+        osc.type = "sawtooth";
+        osc.frequency.value = freq;
+        osc.connect(bp); bp.connect(g); g.connect(master);
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(vol, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(vol * 0.6, t + dur * 0.4);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        osc.start(t); osc.stop(t + dur + 0.05);
+        nodesRef.current.push(osc);
+      };
 
-      // Cmaj7, Am7, Fmaj7, G7 (classic lo-fi progression)
-      const chords = [
-        [130.8, 164.8, 196.0, 246.9], // Cmaj7
-        [110.0, 130.8, 164.8, 196.0], // Am7
-        [87.3,  110.0, 130.8, 164.8], // Fmaj7
-        [98.0,  123.5, 146.8, 174.6], // G7
+      // Helper: kick drum
+      const kick = (t) => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.connect(g); g.connect(master);
+        osc.frequency.setValueAtTime(160, t);
+        osc.frequency.exponentialRampToValueAtTime(40, t + 0.15);
+        g.gain.setValueAtTime(0.8, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+        osc.start(t); osc.stop(t + 0.2);
+        nodesRef.current.push(osc);
+      };
+
+      // Helper: snare
+      const snare = (t) => {
+        const buf = ctx.createBuffer(1, ctx.sampleRate * 0.15, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let j = 0; j < d.length; j++) d[j] = Math.random() * 2 - 1;
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const g = ctx.createGain();
+        const hp = ctx.createBiquadFilter();
+        hp.type = "highpass"; hp.frequency.value = 1500;
+        src.connect(hp); hp.connect(g); g.connect(master);
+        g.gain.setValueAtTime(0.22, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+        src.start(t);
+        nodesRef.current.push(src);
+      };
+
+      // Helper: hi-hat
+      const hat = (t, vol = 0.07) => {
+        const buf = ctx.createBuffer(1, ctx.sampleRate * 0.04, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let j = 0; j < d.length; j++) d[j] = Math.random() * 2 - 1;
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const g = ctx.createGain();
+        const hp = ctx.createBiquadFilter();
+        hp.type = "highpass"; hp.frequency.value = 8000;
+        src.connect(hp); hp.connect(g); g.connect(master);
+        g.gain.setValueAtTime(vol, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+        src.start(t);
+        nodesRef.current.push(src);
+      };
+
+      // Helper: bass note
+      const bassNote = (freq, t, dur) => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        osc.connect(g); g.connect(master);
+        g.gain.setValueAtTime(0.35, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        osc.start(t); osc.stop(t + dur + 0.05);
+        nodesRef.current.push(osc);
+      };
+
+      // 120 BPM — classic game show tempo
+      const BPM = 120;
+      const b = 60 / BPM;   // 0.5s per beat
+      const LOOP = b * 16;  // 4 bars = 8s
+
+      // Family Feud-style upbeat brass melody (C major, bouncy)
+      // Inspired by the show's punchy horn stabs and driving feel
+      const melody = [
+        // bar 1 — C major fanfare feel
+        { freq: 523.3, t: 0,      dur: b * 0.4 },  // C5
+        { freq: 659.3, t: b,      dur: b * 0.4 },  // E5
+        { freq: 784.0, t: b * 2,  dur: b * 0.8 },  // G5
+        { freq: 659.3, t: b * 3,  dur: b * 0.4 },  // E5
+        // bar 2 — bounce down
+        { freq: 587.3, t: b * 4,  dur: b * 0.4 },  // D5
+        { freq: 523.3, t: b * 5,  dur: b * 0.4 },  // C5
+        { freq: 440.0, t: b * 6,  dur: b * 0.8 },  // A4
+        { freq: 392.0, t: b * 7,  dur: b * 0.4 },  // G4
+        // bar 3 — build back up (F → G)
+        { freq: 349.2, t: b * 8,  dur: b * 0.4 },  // F4
+        { freq: 392.0, t: b * 9,  dur: b * 0.4 },  // G4
+        { freq: 440.0, t: b * 10, dur: b * 0.4 },  // A4
+        { freq: 523.3, t: b * 11, dur: b * 0.4 },  // C5
+        // bar 4 — punchy finish
+        { freq: 659.3, t: b * 12, dur: b * 0.3 },  // E5
+        { freq: 784.0, t: b * 12.4, dur: b * 0.3 },// G5
+        { freq: 1046.5,t: b * 12.8, dur: b * 0.6 },// C6 (high punch)
+        { freq: 784.0, t: b * 14, dur: b * 0.4 },  // G5
+        { freq: 659.3, t: b * 15, dur: b * 0.9 },  // E5 (resolve)
       ];
-      const bassRoots = [65.4, 55.0, 43.65, 49.0]; // C2, A1, F1, G1
+
+      // Walking bass line
+      const bassLine = [
+        { freq: 65.4,  t: 0,      dur: b * 1.8 }, // C2
+        { freq: 73.4,  t: b * 2,  dur: b * 0.9 }, // D2
+        { freq: 82.4,  t: b * 3,  dur: b * 0.9 }, // E2
+        { freq: 87.3,  t: b * 4,  dur: b * 1.8 }, // F2
+        { freq: 98.0,  t: b * 6,  dur: b * 1.8 }, // G2
+        { freq: 110.0, t: b * 8,  dur: b * 1.8 }, // A2
+        { freq: 98.0,  t: b * 10, dur: b * 1.8 }, // G2
+        { freq: 87.3,  t: b * 12, dur: b * 0.9 }, // F2
+        { freq: 82.4,  t: b * 13, dur: b * 0.9 }, // E2
+        { freq: 73.4,  t: b * 14, dur: b * 0.9 }, // D2
+        { freq: 65.4,  t: b * 15, dur: b * 0.9 }, // C2
+      ];
 
       const playLoop = () => {
         if (!playingRef.current) return;
         const now = ctx.currentTime;
 
-        chords.forEach((chord, barIdx) => {
-          const t = now + barIdx * bar;
+        // Drums: kick 1&3, snare 2&4, hats on every 8th
+        for (let i = 0; i < 16; i++) {
+          const t = now + i * b;
+          if (i % 4 === 0) kick(t);
+          if (i % 4 === 2) kick(t);
+          if (i % 4 === 1 || i % 4 === 3) snare(t);
+          hat(t, i % 2 === 0 ? 0.08 : 0.05);
+        }
 
-          // Soft kick on beats 1 & 3
-          [0, beat * 2].forEach(o => {
-            const osc = ctx.createOscillator();
-            const g = ctx.createGain();
-            osc.connect(g); g.connect(master);
-            osc.frequency.setValueAtTime(90, t + o);
-            osc.frequency.exponentialRampToValueAtTime(35, t + o + 0.2);
-            g.gain.setValueAtTime(0.45, t + o);
-            g.gain.exponentialRampToValueAtTime(0.001, t + o + 0.22);
-            osc.start(t + o); osc.stop(t + o + 0.22);
-            nodesRef.current.push(osc);
-          });
+        // Brass melody
+        melody.forEach(({ freq, t, dur }) => brass(freq, now + t, dur));
 
-          // Soft snare on beats 2 & 4
-          [beat, beat * 3].forEach(o => {
-            const buf = ctx.createBuffer(1, ctx.sampleRate * 0.12, ctx.sampleRate);
-            const d = buf.getChannelData(0);
-            for (let j = 0; j < d.length; j++) d[j] = (Math.random() * 2 - 1);
-            const src = ctx.createBufferSource();
-            src.buffer = buf;
-            const g = ctx.createGain();
-            const bp = ctx.createBiquadFilter();
-            bp.type = "bandpass"; bp.frequency.value = 900; bp.Q.value = 1.2;
-            src.connect(bp); bp.connect(g); g.connect(master);
-            g.gain.setValueAtTime(0.09, t + o);
-            g.gain.exponentialRampToValueAtTime(0.001, t + o + 0.12);
-            src.start(t + o);
-            nodesRef.current.push(src);
-          });
-
-          // Mellow hi-hats (every half-beat, quiet)
-          for (let i = 0; i < 8; i++) {
-            const o = i * (beat / 2);
-            const buf = ctx.createBuffer(1, ctx.sampleRate * 0.04, ctx.sampleRate);
-            const d = buf.getChannelData(0);
-            for (let j = 0; j < d.length; j++) d[j] = (Math.random() * 2 - 1);
-            const src = ctx.createBufferSource();
-            src.buffer = buf;
-            const g = ctx.createGain();
-            const hp = ctx.createBiquadFilter();
-            hp.type = "highpass"; hp.frequency.value = 9000;
-            src.connect(hp); hp.connect(g); g.connect(master);
-            g.gain.setValueAtTime(i % 2 === 0 ? 0.05 : 0.025, t + o);
-            g.gain.exponentialRampToValueAtTime(0.001, t + o + 0.03);
-            src.start(t + o);
-            nodesRef.current.push(src);
-          }
-
-          // Warm chord stab — triangle waves, slow fade
-          chord.forEach(freq => {
-            const osc = ctx.createOscillator();
-            const g = ctx.createGain();
-            osc.type = "triangle";
-            osc.frequency.value = freq;
-            osc.detune.value = (Math.random() - 0.5) * 6; // slight warmth/detuning
-            osc.connect(g); g.connect(master);
-            g.gain.setValueAtTime(0, t + 0.01);
-            g.gain.linearRampToValueAtTime(0.07, t + 0.08);
-            g.gain.linearRampToValueAtTime(0.04, t + bar - 0.15);
-            g.gain.linearRampToValueAtTime(0, t + bar);
-            osc.start(t); osc.stop(t + bar);
-            nodesRef.current.push(osc);
-          });
-
-          // Warm bass note
-          const bass = ctx.createOscillator();
-          const bg = ctx.createGain();
-          bass.type = "sine";
-          bass.frequency.value = bassRoots[barIdx];
-          bass.connect(bg); bg.connect(master);
-          bg.gain.setValueAtTime(0, t);
-          bg.gain.linearRampToValueAtTime(0.28, t + 0.06);
-          bg.gain.linearRampToValueAtTime(0.18, t + beat);
-          bg.gain.linearRampToValueAtTime(0, t + bar - 0.08);
-          bass.start(t); bass.stop(t + bar);
-          nodesRef.current.push(bass);
-        });
+        // Bass
+        bassLine.forEach(({ freq, t, dur }) => bassNote(freq, now + t, dur));
       };
 
       playLoop();
