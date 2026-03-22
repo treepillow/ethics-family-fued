@@ -71,6 +71,71 @@ const QUESTIONS = [
       { text: "Socio-Cultural Complexity & Inequality", points: 30 },
     ],
   },
+  {
+    question: "Name a concept from Confucian Ethics discussed in the presentation",
+    answers: [
+      { text: "Social Harmony", points: 50 },
+      { text: "Greed of Wealth Accumulation", points: 30 },
+      { text: "Moral Responsibility to Community", points: 20 },
+    ],
+  },
+  {
+    question: "Name a principle from Rawl's Theory of Justice discussed",
+    answers: [
+      { text: "Veil of Ignorance", points: 40 },
+      { text: "Difference Principle", points: 35 },
+      { text: "First Principle (Basic Liberties)", points: 25 },
+    ],
+  },
+  {
+    question: "Name a tenet of Buddhist Ethics applied to green hydrogen",
+    answers: [
+      { text: "Eliminating Craving & Desire", points: 35 },
+      { text: "Doctrine of No Self", points: 35 },
+      { text: "Law of Karma", points: 30 },
+    ],
+  },
+  {
+    question: "Name an opportunity of green hydrogen production",
+    answers: [
+      { text: "Achieving Global Energy Equity", points: 40 },
+      { text: "Economic Development & Industrialisation", points: 35 },
+      { text: "Technology Transfer & Local Skills", points: 25 },
+    ],
+  },
+  {
+    question: "Name something green hydrogen requires for production",
+    answers: [
+      { text: "Renewable Power / Electricity", points: 40 },
+      { text: "Fresh / Purified Water", points: 40 },
+      { text: "Electrolysers", points: 20 },
+    ],
+  },
+  {
+    question: "Name a virtue or concept from Hindu Ethics discussed",
+    answers: [
+      { text: "Ahimsa (Non-violence)", points: 50 },
+      { text: "Santosha (Contentment)", points: 30 },
+      { text: "Moksha (Reducing bad Karma)", points: 20 },
+    ],
+  },
+  {
+    question: "Name a feature of the Whitby Village hydrogen case study",
+    answers: [
+      { text: "No proper community consultation", points: 30 },
+      { text: "Four-fold injury increase risk", points: 30 },
+      { text: "Project was cancelled", points: 25 },
+      { text: "Limited cost transparency", points: 15 },
+    ],
+  },
+  {
+    question: "Name a type of justice from Aristotle's Theory discussed",
+    answers: [
+      { text: "Distributive Justice", points: 40 },
+      { text: "Compensatory Justice", points: 35 },
+      { text: "Retributive Justice", points: 25 },
+    ],
+  },
 ];
 
 const TEAM_COLORS = ["#FF6B6B", "#4ECDC4", "#FFD93D", "#6C5CE7"];
