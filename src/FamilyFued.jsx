@@ -113,91 +113,119 @@ function useMusicEngine() {
       ctxRef.current = ctx;
       playingRef.current = true;
 
-      // Master volume
+      // Master chain: gain → warm lowpass → destination
       const master = ctx.createGain();
-      master.gain.value = 0.18;
-      master.connect(ctx.destination);
+      master.gain.value = 0.14;
+      const warmth = ctx.createBiquadFilter();
+      warmth.type = "lowpass";
+      warmth.frequency.value = 4000;
+      warmth.Q.value = 0.4;
+      master.connect(warmth);
+      warmth.connect(ctx.destination);
 
-      // Bass drum pattern
-      const kickPattern = () => {
+      // Lo-fi: 80 BPM, 4-bar loop cycling through jazz chords
+      const BPM = 80;
+      const beat = 60 / BPM;       // 0.75s
+      const bar = beat * 4;         // 3s
+      const LOOP = bar * 4;         // 12s — full 4-bar cycle
+
+      // Cmaj7, Am7, Fmaj7, G7 (classic lo-fi progression)
+      const chords = [
+        [130.8, 164.8, 196.0, 246.9], // Cmaj7
+        [110.0, 130.8, 164.8, 196.0], // Am7
+        [87.3,  110.0, 130.8, 164.8], // Fmaj7
+        [98.0,  123.5, 146.8, 174.6], // G7
+      ];
+      const bassRoots = [65.4, 55.0, 43.65, 49.0]; // C2, A1, F1, G1
+
+      const playLoop = () => {
         if (!playingRef.current) return;
         const now = ctx.currentTime;
-        for (let i = 0; i < 8; i++) {
-          const osc = ctx.createOscillator();
-          const g = ctx.createGain();
-          osc.connect(g); g.connect(master);
-          osc.frequency.setValueAtTime(150, now + i * 0.5);
-          osc.frequency.exponentialRampToValueAtTime(40, now + i * 0.5 + 0.12);
-          g.gain.setValueAtTime(0.7, now + i * 0.5);
-          g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.5 + 0.15);
-          osc.start(now + i * 0.5);
-          osc.stop(now + i * 0.5 + 0.15);
-          nodesRef.current.push(osc);
-        }
-      };
 
-      // Hi-hat pattern
-      const hihatPattern = () => {
-        if (!playingRef.current) return;
-        const now = ctx.currentTime;
-        for (let i = 0; i < 16; i++) {
-          const bufferSize = ctx.sampleRate * 0.04;
-          const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-          const data = buffer.getChannelData(0);
-          for (let j = 0; j < bufferSize; j++) data[j] = (Math.random() * 2 - 1) * 0.3;
-          const src = ctx.createBufferSource();
-          src.buffer = buffer;
-          const g = ctx.createGain();
-          const hp = ctx.createBiquadFilter();
-          hp.type = "highpass"; hp.frequency.value = 7000;
-          src.connect(hp); hp.connect(g); g.connect(master);
-          g.gain.setValueAtTime(i % 2 === 0 ? 0.3 : 0.15, now + i * 0.25);
-          g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.25 + 0.05);
-          src.start(now + i * 0.25);
-          nodesRef.current.push(src);
-        }
-      };
+        chords.forEach((chord, barIdx) => {
+          const t = now + barIdx * bar;
 
-      // Tense melody — minor key ascending pattern
-      const melodyPattern = () => {
-        if (!playingRef.current) return;
-        const now = ctx.currentTime;
-        const notes = [220, 261.6, 293.7, 329.6, 349.2, 329.6, 293.7, 261.6];
-        notes.forEach((freq, i) => {
-          const osc = ctx.createOscillator();
-          const g = ctx.createGain();
-          osc.type = "sawtooth";
-          osc.connect(g); g.connect(master);
-          osc.frequency.value = freq;
-          g.gain.setValueAtTime(0, now + i * 0.5);
-          g.gain.linearRampToValueAtTime(0.12, now + i * 0.5 + 0.05);
-          g.gain.linearRampToValueAtTime(0.06, now + i * 0.5 + 0.3);
-          g.gain.linearRampToValueAtTime(0, now + i * 0.5 + 0.48);
-          osc.start(now + i * 0.5);
-          osc.stop(now + i * 0.5 + 0.5);
-          nodesRef.current.push(osc);
+          // Soft kick on beats 1 & 3
+          [0, beat * 2].forEach(o => {
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.connect(g); g.connect(master);
+            osc.frequency.setValueAtTime(90, t + o);
+            osc.frequency.exponentialRampToValueAtTime(35, t + o + 0.2);
+            g.gain.setValueAtTime(0.45, t + o);
+            g.gain.exponentialRampToValueAtTime(0.001, t + o + 0.22);
+            osc.start(t + o); osc.stop(t + o + 0.22);
+            nodesRef.current.push(osc);
+          });
+
+          // Soft snare on beats 2 & 4
+          [beat, beat * 3].forEach(o => {
+            const buf = ctx.createBuffer(1, ctx.sampleRate * 0.12, ctx.sampleRate);
+            const d = buf.getChannelData(0);
+            for (let j = 0; j < d.length; j++) d[j] = (Math.random() * 2 - 1);
+            const src = ctx.createBufferSource();
+            src.buffer = buf;
+            const g = ctx.createGain();
+            const bp = ctx.createBiquadFilter();
+            bp.type = "bandpass"; bp.frequency.value = 900; bp.Q.value = 1.2;
+            src.connect(bp); bp.connect(g); g.connect(master);
+            g.gain.setValueAtTime(0.09, t + o);
+            g.gain.exponentialRampToValueAtTime(0.001, t + o + 0.12);
+            src.start(t + o);
+            nodesRef.current.push(src);
+          });
+
+          // Mellow hi-hats (every half-beat, quiet)
+          for (let i = 0; i < 8; i++) {
+            const o = i * (beat / 2);
+            const buf = ctx.createBuffer(1, ctx.sampleRate * 0.04, ctx.sampleRate);
+            const d = buf.getChannelData(0);
+            for (let j = 0; j < d.length; j++) d[j] = (Math.random() * 2 - 1);
+            const src = ctx.createBufferSource();
+            src.buffer = buf;
+            const g = ctx.createGain();
+            const hp = ctx.createBiquadFilter();
+            hp.type = "highpass"; hp.frequency.value = 9000;
+            src.connect(hp); hp.connect(g); g.connect(master);
+            g.gain.setValueAtTime(i % 2 === 0 ? 0.05 : 0.025, t + o);
+            g.gain.exponentialRampToValueAtTime(0.001, t + o + 0.03);
+            src.start(t + o);
+            nodesRef.current.push(src);
+          }
+
+          // Warm chord stab — triangle waves, slow fade
+          chord.forEach(freq => {
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = "triangle";
+            osc.frequency.value = freq;
+            osc.detune.value = (Math.random() - 0.5) * 6; // slight warmth/detuning
+            osc.connect(g); g.connect(master);
+            g.gain.setValueAtTime(0, t + 0.01);
+            g.gain.linearRampToValueAtTime(0.07, t + 0.08);
+            g.gain.linearRampToValueAtTime(0.04, t + bar - 0.15);
+            g.gain.linearRampToValueAtTime(0, t + bar);
+            osc.start(t); osc.stop(t + bar);
+            nodesRef.current.push(osc);
+          });
+
+          // Warm bass note
+          const bass = ctx.createOscillator();
+          const bg = ctx.createGain();
+          bass.type = "sine";
+          bass.frequency.value = bassRoots[barIdx];
+          bass.connect(bg); bg.connect(master);
+          bg.gain.setValueAtTime(0, t);
+          bg.gain.linearRampToValueAtTime(0.28, t + 0.06);
+          bg.gain.linearRampToValueAtTime(0.18, t + beat);
+          bg.gain.linearRampToValueAtTime(0, t + bar - 0.08);
+          bass.start(t); bass.stop(t + bar);
+          nodesRef.current.push(bass);
         });
       };
 
-      // Sub bass drone
-      const drone = ctx.createOscillator();
-      const droneGain = ctx.createGain();
-      drone.type = "sine";
-      drone.frequency.value = 55;
-      droneGain.gain.value = 0.15;
-      drone.connect(droneGain); droneGain.connect(master);
-      drone.start();
-      nodesRef.current.push(drone);
-
-      // Loop patterns
-      const loop = () => {
-        if (!playingRef.current) return;
-        kickPattern();
-        hihatPattern();
-        melodyPattern();
-      };
-      loop();
-      intervalRef.current = setInterval(loop, 4000);
+      playLoop();
+      intervalRef.current = setInterval(playLoop, LOOP * 1000);
 
     } catch (e) {
       console.log("Audio not available");
@@ -459,7 +487,7 @@ export default function FamilyFeud() {
   if (screen === "title") {
     return (
       <div style={{
-        minHeight: "100vh", background: "radial-gradient(ellipse at 50% 30%, #1a3a5c 0%, #0a1628 60%, #050d18 100%)",
+        height: "100vh", background: "radial-gradient(ellipse at 50% 30%, #1a3a5c 0%, #0a1628 60%, #050d18 100%)",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         fontFamily: "'Bebas Neue', sans-serif", padding: "20px", overflow: "hidden", position: "relative",
       }}>
@@ -544,7 +572,7 @@ export default function FamilyFeud() {
     const sorted = scores.map((s, i) => ({ score: s, idx: i })).sort((a, b) => b.score - a.score);
     return (
       <div style={{
-        minHeight: "100vh", background: "radial-gradient(ellipse at 50% 30%, #1a3a5c 0%, #0a1628 60%, #050d18 100%)",
+        height: "100vh", background: "radial-gradient(ellipse at 50% 30%, #1a3a5c 0%, #0a1628 60%, #050d18 100%)",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         fontFamily: "'Bebas Neue', sans-serif", padding: "20px", position: "relative", overflow: "hidden",
       }}>
@@ -595,8 +623,8 @@ export default function FamilyFeud() {
   /* ── GAME ── */
   return (
     <div style={{
-      minHeight: "100vh", background: "radial-gradient(ellipse at 50% 20%, #1a3a5c 0%, #0a1628 60%, #050d18 100%)",
-      fontFamily: "'Bebas Neue', sans-serif", padding: "12px", display: "flex", flexDirection: "column", position: "relative",
+      height: "100vh", background: "radial-gradient(ellipse at 50% 20%, #1a3a5c 0%, #0a1628 60%, #050d18 100%)",
+      fontFamily: "'Bebas Neue', sans-serif", padding: "12px", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden",
     }}>
       <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;600;700&family=Righteous&display=swap" rel="stylesheet" />
       <style>{GLOBAL_STYLES}</style>
