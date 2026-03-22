@@ -562,7 +562,7 @@ export default function FamilyFeud() {
   const revealAll = () => {
     setTimerRunning(false);
     question.answers.forEach((_, i) => {
-      if (!revealed.includes(i)) setTimeout(() => revealAnswer(i), i * 300);
+      if (!revealed.includes(i)) setTimeout(() => setRevealed((p) => [...p, i]), i * 300);
     });
   };
 
