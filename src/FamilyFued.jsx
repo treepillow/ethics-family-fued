@@ -128,18 +128,10 @@ const QUESTIONS = [
       { text: "Limited cost transparency", points: 15 },
     ],
   },
-  {
-    question: "Name a type of justice from Aristotle's Theory discussed",
-    answers: [
-      { text: "Distributive Justice", points: 40 },
-      { text: "Compensatory Justice", points: 35 },
-      { text: "Retributive Justice", points: 25 },
-    ],
-  },
 ];
 
-const TEAM_COLORS = ["#FF6B6B", "#4ECDC4", "#FFD93D", "#6C5CE7"];
-const TEAM_EMOJIS = ["🔴", "🟢", "🟡", "🟣"];
+const TEAM_COLORS = ["#FF6B6B", "#4ECDC4", "#FFD93D"];
+const TEAM_EMOJIS = ["🔴", "🟢", "🟡"];
 const DEFAULT_TIME = 30;
 
 const GLOBAL_STYLES = `
@@ -482,9 +474,9 @@ function HostBtn({ label, color, onClick }) {
 
 export default function FamilyFeud() {
   const [screen, setScreen] = useState("title");
-  const [teamNames, setTeamNames] = useState(["Row 1", "Row 2", "Row 3", "Row 4"]);
+  const [teamNames, setTeamNames] = useState(["Row 1", "Row 2", "Row 3"]);
   const [timerDuration, setTimerDuration] = useState(DEFAULT_TIME);
-  const [scores, setScores] = useState([0, 0, 0, 0]);
+  const [scores, setScores] = useState([0, 0, 0]);
   const [currentQ, setCurrentQ] = useState(0);
   const [revealed, setRevealed] = useState([]);
   const [activeTeam, setActiveTeam] = useState(0);
@@ -554,7 +546,7 @@ export default function FamilyFeud() {
       setCurrentQ((p) => p + 1);
       setRevealed([]);
       setTimerRunning(false); setShowTimesUp(false);
-      setActiveTeam((p) => (p + 1) % 4);
+      setActiveTeam((p) => (p + 1) % 3);
       setTimeout(() => { setTimeLeft(timerDuration); setTimerRunning(true); }, 600);
     }
   };
@@ -573,7 +565,7 @@ export default function FamilyFeud() {
 
   const resetGame = () => {
     music.stop();
-    setScreen("title"); setScores([0, 0, 0, 0]); setCurrentQ(0);
+    setScreen("title"); setScores([0, 0, 0]); setCurrentQ(0);
     setRevealed([]); setActiveTeam(0);
     setTimerRunning(false); setShowTimesUp(false); setTimeLeft(timerDuration);
     setMusicOn(true);
@@ -758,7 +750,7 @@ export default function FamilyFeud() {
         />
 
         <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-          {[2, 3].map((i) => (
+          {[2].map((i) => (
             <div key={i} onClick={() => setActiveTeam(i)} style={{
               background: activeTeam === i ? `linear-gradient(135deg, ${TEAM_COLORS[i]}30, ${TEAM_COLORS[i]}15)` : "rgba(255,255,255,0.03)",
               border: `2px solid ${activeTeam === i ? TEAM_COLORS[i] : TEAM_COLORS[i] + "30"}`,
